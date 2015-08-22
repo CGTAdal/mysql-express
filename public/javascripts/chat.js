@@ -8,12 +8,12 @@ window.onload = function() {
  
     socket.on('message', function (data) {
         var content = document.getElementById("content");
-        console.log(content,data);
+        // console.log(content,data);
         if(content) {
             /*messages.push(data);
             var html = '';
             for(var i=0; i<messages.length; i++) {
-                html += '<b>' + (messages[i].url ? messages[i].url : 'Server') + ': </b>';
+                html += '<b>' + (messages[i].device_id ? messages[i].device_id : 'Server') + ': </b>';
                 html += messages[i].title + '<br />';
             }
             content.innerHTML = html;*/
@@ -22,8 +22,8 @@ window.onload = function() {
             if(data.length > 0 ){
                 var html = '';
                 for(var i=0; i<data.length; i++) {
-                    html += '<b>' + (data[i].url ? data[i].url : 'Server') + ': </b>';
-                    html += data[i].title + '<br />';
+                    html += '<b>' + (data[i].device_id ? data[i].device_id : 'Device') + ': </b>';
+                    html += data[i].desc + '<br />';
                 }
                 content.innerHTML = html;
             }
@@ -41,7 +41,7 @@ window.onload = function() {
                 // alert("Please type your name!");
             // } else {
                 var text = title.value;
-                socket.emit('send', { title: text, url: url.value });
+                socket.emit('send', { desc: text, device_id: url.value });
                 title.value = "";
                 url.value = "";
             // }

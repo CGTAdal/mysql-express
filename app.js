@@ -4,11 +4,16 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
-var http = require('http');
-var port = 3016;
+var mysql = require("mysql");
 
-var sqlite3 = require('sqlite3').verbose(),
-    db = new sqlite3.Database('cozy.db');
+var pool = mysql.createPool({
+    connectionLimit   :   100,
+    host              :   'localhost',
+    user              :   'root',
+    password          :   'root',
+    database          :   'poolapp',
+    debug             :   false
+});
 
 var routes = require('./routes/index');
 var users = require('./routes/users');
@@ -42,28 +47,7 @@ app.use('/bookmarks', bookmarks);
 
 // Database initialization
 /***************************************************/
-db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='bookmarks'",
-  function(err, rows) {
-    if(err !== null) {
-      console.log(err);
-    }
-    else if(rows === undefined) {
-      db.run('CREATE TABLE "bookmarks" ' +
-             '("id" INTEGER PRIMARY KEY AUTOINCREMENT, ' +
-             '"title" VARCHAR(255), ' +
-             'url VARCHAR(255))', function(err) {
-        if(err !== null) {
-          console.log(err);
-        }
-        else {
-          console.log("SQL Table 'bookmarks' initialized.");
-        }
-      });
-    }
-    else {
-      console.log("SQL Table 'bookmarks' already initialized.");
-    }
-  });
+
 /***************************************************/
 
 // catch 404 and forward to error handler
@@ -97,72 +81,35 @@ app.use(function(err, req, res, next) {
   });
 });
 
-/*var httpServer = http.Server(app);
-httpServer.listen(port, function(){
-    console.log("server listening on port", port);
-});*/
 
-// io = require('socket.io').listen(httpServer);
-// io.use(sharedsession(session));
-/*io.on('connection', function(socket){
-    console.log("connected");
-    // socket.emit("greetings", {msg:"hello"});
-    // socket.on("something", function(data){
-    //     console.log("client["+socket.handshake.session.myCustomData.userID+"] sent data: " + data);
-    // })
-    socket.emit('message', { title: 'welcome to the chat' });
-    socket.on('send', function (data) {
-        console.log("send ",data);
-        io.sockets.emit('message', data);
-    });
-});*/
-
-var connectionsArray = [],POLLING_INTERVAL=3000;
-
+var connectionsArray = [],POLLING_INTERVAL = 1000;
 var pollingLoop = function () {
     console.log('pollingLoop');
-    // Make the database query
-    /*var query = connection.query('SELECT * FROM users'),
-        users = []; // this array will contain the result of our db query
 
-    // set up the query listeners
-    query
-    .on('error', function(err) {
-        // Handle error, and 'end' event will be emitted after this as well
-        console.log( err );
-        updateSockets( err );
-        
-    })
-    .on('result', function( user ) {
-        // it fills our array looping on each user row inside the db
-        users.push( user );
-    })
-    .on('end',function(){
-        // loop on itself only if there are sockets still connected
-        if(connectionsArray.length) {
+    pool.getConnection(function(err,connection){
+        if (err) {
+            connection.release();
+            // if (err) throw err;
             pollingTimer = setTimeout( pollingLoop, POLLING_INTERVAL );
-            // message: text, url: url.value
-            updateSockets({users:users});
+            return;
         }
-    });*/
-
-    db.all('SELECT * FROM bookmarks ORDER BY id', function(err, row) {
-      if(err !== null) {
-        // Express handles errors via its next function.
-        // It will call the next operation layer (middleware),
-        // which is by default one that handles errors.
-        next(err);
-      }else {
-        console.log(row);
-        /*res.render('bookmarks/index', {title: 'My Bookmarks',bookmarks: row}, function(err, html) {
-          res.send(200, html);
-        });*/
-        if(connectionsArray.length) {
+        var datetime = '2015-08-22 15:09:18';
+        connection.query("SELECT * FROM geodata WHERE created_on >= '"+datetime+"'", function(err, rows, fields) {
+            // if (err) throw err;
+            if(!err){
+                // console.log('The data: ', rows);
+                if(connectionsArray.length) {
+                    pollingTimer = setTimeout( pollingLoop, POLLING_INTERVAL );
+                    // {title: text, url: url.value
+                    updateSockets(rows);
+                }
+            }
+        });
+        connection.on('error', function(err) {
+            // if (err) throw err;
             pollingTimer = setTimeout( pollingLoop, POLLING_INTERVAL );
-            // {title: text, url: url.value
-            updateSockets(row);
-        }
-      }
+            return;
+        });
     });
 };
 
@@ -171,7 +118,7 @@ var pollingLoop = function () {
 io.on('connection', function(socket){
     console.log('Number of connections:' + connectionsArray.length);
     // start the polling loop only if at least there is one user connected
-    if (connectionsArray.length) {
+    if (!connectionsArray.length) {
         pollingLoop();
     }
     socket.on('disconnect', function () {
@@ -181,25 +128,29 @@ io.on('connection', function(socket){
             connectionsArray.splice( socketIndex, 1 );
         }
     });
+
     /*socket.on('send', function (data) {
-        // console.log("send ",data);
-        // io.sockets.emit('message', data);
-        var title = data.title;
-        var url = data.url;
-        var sqlRequest = "INSERT INTO 'bookmarks' (title, url) " +
-                     "VALUES('" + title + "', '" + url + "')"
-        db.run(sqlRequest, function(err) {
-          if(err !== null) {
-            next(err);
-          }else {
-            // res.redirect('/bookmarks');
-            console.log("sent data saved",data);
-            sendDataToClient();
-          }
+        var device_id = data.device_id;
+        var desc = data.desc;
+
+        pool.getConnection(function(err,connection){
+            if (err) {
+                connection.release();
+                callback(false);
+                return;
+            }
+            connection.query("INSERT INTO `poolapp`.`geodata` (`id`, `device_id`, `desc`, `lat`, `long`, `created_on`) VALUES (NULL,"+device_id+", '"+desc+"', GeomFromText(NULL), GeomFromText(NULL), CURRENT_TIMESTAMP)",function(err,rows){
+                connection.release();
+                if(!err) {
+                    console.log("sent data saved",data);
+                    sendDataToClient();
+                }
+            });
         });
     });*/
     console.log( 'A new socket is connected!' );
     connectionsArray.push( socket );
+    // console.log(socket.nsp);
 });
 
 var updateSockets = function ( data ) {
@@ -209,27 +160,27 @@ var updateSockets = function ( data ) {
     connectionsArray.forEach(function( tmpSocket ){
         // 'message', { title: 'welcome to the chat' }
         // tmpSocket.volatile.emit( 'notification' , data );
-        tmpSocket.volatile.emit( 'message' , data );
+        tmpSocket.emit('message',data);
     });
 };
 
 var sendDataToClient = function(){
-    db.all('SELECT * FROM bookmarks ORDER BY id', function(err, row) {
-      if(err !== null) {
-        // Express handles errors via its next function.
-        // It will call the next operation layer (middleware),
-        // which is by default one that handles errors.
-        next(err);
-      }else {
-        console.log(row);
-        // data.time = new Date();
-        // send new data to all the sockets connected
-        connectionsArray.forEach(function( tmpSocket ){
-            // 'message', { title: 'welcome to the chat' }
-            // tmpSocket.volatile.emit( 'notification' , data );
-            tmpSocket.volatile.emit( 'message' , row );
+    pool.getConnection(function(err,connection){
+        if (err) {
+            connection.release();
+            // throw err;
+            return;
+        }
+        var datetime = '2015-08-22 15:09:18';
+        connection.query("SELECT * FROM geodata WHERE created_on >= '"+datetime+"'", function(err, rows, fields) {
+            // if (err) throw err;
+            console.log('The solution is: ', rows);
+            updateSockets(rows);
         });
-      }
+        connection.on('error', function(err) {
+            // if (err) throw err;
+            return;
+        });
     });
 };
 

@@ -7,9 +7,9 @@ block content
         a(href="/bookmarks/add") Add New Bookmark
     ul#content
         - for(bookmark in bookmarks) {
-        li= bookmarks[bookmark].title
+        li= bookmarks[bookmark].device_id
         | &nbsp;- (
-        a(href=bookmarks[bookmark].url) link
+        a(href=bookmarks[bookmark].desc) link
         | )
         | &nbsp;- (
         a(href="/bookmarks/edit/"+bookmarks[bookmark].id) edit
