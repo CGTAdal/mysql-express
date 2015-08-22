@@ -1,0 +1,13 @@
+doctype html
+html
+	head
+		title= title
+		link(rel='stylesheet', href='/stylesheets/style.css')
+		script(src='/socket.io/socket.io.js')
+		script(src='/javascripts/chat.js')
+	body
+	a(href="/") Home&nbsp;|&nbsp;
+	a(href="/bookmarks") Bookmarks&nbsp;|&nbsp;
+	a(href="/bookmarks") Signin&nbsp;|&nbsp;
+	a(href="/bookmarks") Signup
+	block content    

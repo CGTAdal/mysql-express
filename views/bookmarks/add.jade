@@ -1,0 +1,10 @@
+extends ../layout
+block content
+	p
+		a(href="/bookmarks") Bookmark List
+	form(action="add", method="post")
+		label Title:
+		input(type="text", name="title", id="title")
+		label Url:
+		input(type="text", name="url", id="url")
+		input(type="button", value="Add a new bookmark" id="send")
